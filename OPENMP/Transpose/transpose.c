@@ -78,7 +78,7 @@ int main(int argc, char ** argv) {
   int    Tile_order=32; /* default tile size for tiling of local transpose */
   int    iterations;    /* number of times to do the transpose             */
   int    tiling;        /* boolean: true if tiling is used                 */
-  int    i, j, it, jt, iter;  /* dummies                                   */
+  long   i, j, it, jt, iter;  /* dummies                                   */
   double bytes;         /* combined size of matrices                       */
   double * RESTRICT A;  /* buffer to hold original matrix                  */
   double * RESTRICT B;  /* buffer to hold transposed matrix                */
@@ -248,11 +248,18 @@ int main(int argc, char ** argv) {
 
   } /* end of OpenMP parallel region */
 
-  abserr =  test_results (order, B, iterations);
-
   /*********************************************************************
   ** Analyze and output results.
   *********************************************************************/
+
+  abserr=0.0;
+  double addit = ((double)(iterations+1) * (double) (iterations))/2.0;
+  #pragma omp parallel for private(i) reduction(+:abserr)
+  for (j=0;j<order;j++) {
+    for (i=0;i<order; i++) {
+      abserr += ABS(B(i,j) - ((i*order + j)*(iterations+1)+addit));
+    }
+  }
 
   if (abserr < epsilon) {
     printf("Solution validates\n");
@@ -272,28 +279,3 @@ int main(int argc, char ** argv) {
 
 }  /* end of main */
 
-
-
-/* function that computes the error committed during the transposition */
-
-double test_results (int order, double *B, int iterations) {
-
-  double abserr=0.0;
-  int i,j;
-
-  double addit = ((double)(iterations+1) * (double) (iterations))/2.0;
-  #pragma omp parallel for private(i) reduction(+:abserr)
-  for (j=0;j<order;j++) {
-    for (i=0;i<order; i++) {
-      abserr += ABS(B(i,j) - ((i*order + j)*(iterations+1)+addit));
-    }
-  }
-
-#ifdef VERBOSE
-  #pragma omp master 
-  {
-  printf(" Squared sum of differences: %f\n",abserr);
-  }
-#endif   
-  return abserr;
-}
