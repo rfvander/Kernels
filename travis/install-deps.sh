@@ -84,7 +84,8 @@ case "$PRK_TARGET" in
         ;;
     alllegion)
         echo "Legion"
-        sh ./travis/install-gasnet.sh $TRAVIS_ROOT
+        # GASNet is not needed, it seems
+        #sh ./travis/install-gasnet.sh $TRAVIS_ROOT
         sh ./travis/install-legion.sh $TRAVIS_ROOT
         ;;
 esac
