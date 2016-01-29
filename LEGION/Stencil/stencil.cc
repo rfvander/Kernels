@@ -133,7 +133,7 @@ void top_level_task(const Task *task,
                     Context ctx, HighLevelRuntime *runtime)
 {
   int n;
-  int x_divs, y_divs, threads;
+  int x_divs = INT_MAX, y_divs = INT_MAX, threads;
   int iterations;
 
   /*********************************************************************
@@ -669,7 +669,7 @@ std::pair<double, double> spmd_task(const Task *task,
   runtime->execute_task(ctx, init_launcher);
 
   // Run a bunch of steps
-  double ts_start, ts_end;
+  double ts_start = DBL_MAX, ts_end = DBL_MIN;
   for (int iter = 0; iter <= args->iterations; iter++)
   {
     if(iter == 1)
@@ -874,8 +874,11 @@ void stencil_field_task(const Task *task,
   FieldID weight_fid = *(task->regions[2].privilege_fields.begin());
   FieldID ghost_fid;
 
-  if(num_neighbors > 0)
+  if(num_neighbors > 0) {
     ghost_fid = *(task->regions[3].privilege_fields.begin());
+  } else {
+    ghost_fid = INT_MAX; /* silence uninitialized warning */
+  }
 
   RegionAccessor<AccessorType::Generic, double> write_acc =
     regions[0].get_field_accessor(write_fid).typeify<double>();
@@ -931,7 +934,9 @@ void stencil_field_task(const Task *task,
   RegionAccessor<AccessorType::Generic, double> right_ghost_acc;
   RegionAccessor<AccessorType::Generic, double> south_ghost_acc;
 
-  unsigned MYTHREAD = args->MYTHREAD;
+  /* UNUSED
+   * unsigned MYTHREAD = args->MYTHREAD;
+   */
 
   unsigned idx = 0;
   if (args->region_idx[GHOST_LEFT] != -1){
@@ -978,10 +983,12 @@ void stencil_field_task(const Task *task,
       assert(south_rect == subrect_g);
   }
 
-  int lower_y = main_rect.lo.x[1];
-  int lower_x = main_rect.lo.x[0];
-  int upper_y = main_rect.hi.x[1];
-  int upper_x = main_rect.hi.x[0];
+  /* UNUSED
+   * int lower_y = main_rect.lo.x[1];
+   * int lower_x = main_rect.lo.x[0];
+   * int upper_y = main_rect.hi.x[1];
+   * int upper_x = main_rect.hi.x[0];
+   */
 
   int x_divs = args->x_divs;
   int y_divs = args->y_divs;
@@ -1004,7 +1011,9 @@ void stencil_field_task(const Task *task,
 
   int start_idx = (starty*blockx) + startx;
   int end_idx = (endy*blockx) + endx;
-  int grid_size = (endx-startx+1) * (endy-starty+1);
+  /* UNUSED
+   * int grid_size = (endx-startx+1) * (endy-starty+1);
+   */
 
   int sizew = 2*RADIUS+1;
 
