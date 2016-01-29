@@ -285,6 +285,6 @@ case "$PRK_TARGET" in
     alllegion)
         echo "Legion"
         echo "LEGIONTOP=$TRAVIS_ROOT/legion" > common/make.defs
-        make $PRK_TARGET
+        make $PRK_TARGET -k
         ;;
 esac
