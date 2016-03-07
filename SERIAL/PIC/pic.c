@@ -51,6 +51,15 @@ FUNCTIONS CALLED:
 
          Other than standard C functions, the following functions are used in 
          this program:
+         initializeGrid() 
+         initializeParticlesGeometric()
+         initializeParticlesSinusoidal()
+         initializeParticlesLinear()
+         initializeParticlesPatch()
+         finishParticlesInitialization()
+         computeCoulomb()
+         computeTotalForce()
+         verifyParticle()
          wtime()
          bad_patch()
          random_draw()
@@ -71,26 +80,20 @@ HISTORY: - Written by Evangelos Georganas, August 2015.
 #define PRK_M_PI 3.14159265358979323846264338327950288419716939937510
 #endif
 
-#include <stdint.h>
-#include <inttypes.h>
-
 #define QG(i,j,g) Qgrid[(j)*(g)+i]
 #define MASS_INV 1.0
 #define Q 1.0
 #define epsilon 0.000001
 #define DT 1.0
 
-#define SUCCESS 1
-#define FAILURE 0
-
 #define REL_X 0.5
 #define REL_Y 0.5
 
-#define GEOMETRIC  0
-#define SINUSOIDAL 1
-#define LINEAR     2
-#define PATCH      3
-#define UNDEFINED  4
+#define GEOMETRIC  10
+#define SINUSOIDAL 11
+#define LINEAR     12
+#define PATCH      13
+#define UNDEFINED  14
 
 typedef struct {
   uint64_t left;
@@ -106,18 +109,14 @@ typedef struct particle_t {
   double   v_x;
   double   v_y;
   double   q;
+  int64_t  k; //  determines how many cells particles move per time step in the x direction 
+  int64_t  m; //  determines how many cells particles move per time step in the y direction 
   /* The following variables are used only for verification/debug purposes */
   double   x0;
   double   y0;
-  int64_t  k; //  determines how many cells particles move per time step in the x direction 
-  int64_t  m; //  determines how many cells particles move per time step in the y direction 
 } particle_t;
 
-/* Initializes the grid of charges
-  We follow a column major format for the grid. Note that this may affect cache performance, depending on access pattern of particles. */
-
-/* The grid is indexed in this way:
- 
+/* Initializes the grid of charges 
    y  ^                                        
       |
       |
@@ -127,23 +126,26 @@ typedef struct particle_t {
       |
    (0,0)--------------> x                           */
 
-double *initializeGrid(uint64_t g) {
-  double   *Qgrid;
-  uint64_t  y, x;
+double *initializeGrid(bbox_t tile) {
+  double   *grid;
+  uint64_t x, y, n_columns, n_rows;
+
+  n_columns = tile.right-tile.left;
+  n_rows = tile.top-tile.bottom;
    
-  Qgrid = (double*) prk_malloc(g*g*sizeof(double));
-  if (Qgrid == NULL) {
+  grid = (double*) malloc(n_columns*n_rows*sizeof(double));
+  if (grid == NULL) {
     printf("ERROR: Could not allocate space for grid\n");
     exit(EXIT_FAILURE);
   }
-   
-  /* initialization with dipoles */
-  for (x=0; x<g; x++) {
-    for (y=0; y<g; y++) {
-      QG(y,x,g) = (x%2 == 0) ? Q : -Q;
+
+  /* So far supporting only initialization with dipoles */
+  for (y=0; y<n_rows; y++) {
+    for (x=0; x<n_columns; x++) {
+      grid[y+x*n_rows] = (x%2 == 0) ? Q : -Q;
     }
   }
-  return Qgrid;
+  return grid;
 }
 
 /* Initializes the particles following the geometric distribution as described in the spec */
@@ -313,9 +315,9 @@ int verifyParticle(particle_t p, uint64_t iterations, double *Qgrid, uint64_t g)
   y_periodic = fmod(y_final+(double)(iterations+1) *fabs(p.m)*L, L);
    
   if ( fabs(p.x - x_periodic) > epsilon || fabs(p.y - y_periodic) > epsilon) {
-    return FAILURE;
+    return(0);
   }
-  return SUCCESS;
+  return(1);
 }
 
 /* Computes the Coulomb force among two charges q1 and q2 */
@@ -412,32 +414,32 @@ int main(int argc, char ** argv) {
     printf("             \"SINUSOIDAL\" parameters: none\n");
     printf("             \"LINEAR\"     parameters: <negative slope> <constant offset>\n");
     printf("             \"PATCH\"      parameters: <xleft> <xright>  <ybottom> <ytop>\n");
-    exit(SUCCESS);
+    exit(EXIT_SUCCESS);
   }
    
   iterations = atol(*++argv);  args_used++;   
   if (iterations<1) {
     printf("ERROR: Number of time steps must be positive: %ld\n", iterations);
-    exit(FAILURE);
+    exit(EXIT_FAILURE);
   }
   L = atol(*++argv);  args_used++;   
   if (L<1 || L%2) {
     printf("ERROR: Number of grid cells must be positive and even: %ld\n", L);
-    exit(FAILURE);
+    exit(EXIT_FAILURE);
   }
   g = L+1;
-  grid_patch = (bbox_t){0, g, 0, g};
+  grid_patch = (bbox_t){0, L+1, 0, L+1};
   n = atol(*++argv);  args_used++;   
   if (n<1) {
     printf("ERROR: Number of particles must be positive: %ld\n", n);
-    exit(FAILURE);
+    exit(EXIT_FAILURE);
   }
 
   particle_mode  = UNDEFINED;
   k = atoi(*++argv);   args_used++; 
   if (k<0) {
     printf("ERROR: Particle semi-charge must be non-negative: %lu\n", k);
-    exit(FAILURE);
+    exit(EXIT_FAILURE);
   }
   m = atoi(*++argv);   args_used++; 
   init_mode = *++argv; args_used++;  
@@ -446,7 +448,7 @@ int main(int argc, char ** argv) {
   if (strcmp(init_mode, "GEOMETRIC") == 0) {
     if (argc<args_used+1) {
       printf("ERROR: Not enough arguments for GEOMETRIC\n"); 
-      exit(FAILURE);
+      exit(EXIT_FAILURE);
     }
     particle_mode = GEOMETRIC;
     rho = atof(*++argv);   args_used++;
@@ -477,7 +479,7 @@ int main(int argc, char ** argv) {
   if (strcmp(init_mode, "PATCH") == 0) {
     if (argc<args_used+4) {
       printf("ERROR: Not enough arguments for PATCH initialization\n");
-      exit(FAILURE);
+      exit(EXIT_FAILURE);
     }
     particle_mode = PATCH;
     init_patch.left   = atoi(*++argv); args_used++;
@@ -486,7 +488,7 @@ int main(int argc, char ** argv) {
     init_patch.top    = atoi(*++argv); args_used++;
     if (bad_patch(&init_patch, &grid_patch)) {
       printf("ERROR: inconsistent initial patch\n");
-      exit(FAILURE);
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -503,20 +505,22 @@ int main(int argc, char ** argv) {
                          init_patch.left, init_patch.right, 
                          init_patch.bottom, init_patch.top);              break;
   default:        printf("ERROR: Unsupported particle initializating mode\n");
-                   exit(FAILURE);
+                  exit(EXIT_FAILURE);
   }
   printf("Particle charge semi-increment = %lu\n", k);
   printf("Vertical velocity              = %lu\n", m);
    
   /* Initialize grid of charges and particles */
-  Qgrid = initializeGrid(g);
+  //  Qgrid = initializeGridold(g);
+  Qgrid = initializeGrid(grid_patch);
    
   switch(particle_mode) {
   case GEOMETRIC:  particles = initializeParticlesGeometric(n, L, rho, &n);      break;
   case SINUSOIDAL: particles = initializeParticlesSinusoidal(n, L, &n);          break;
   case LINEAR:     particles = initializeParticlesLinear(n, L, alpha, beta, &n); break;
   case PATCH:      particles = initializeParticlesPatch(n, L, init_patch, &n);   break;
-  default:         printf("ERROR: Unsupported particle distribution\n");  exit(FAILURE);
+  default:         printf("ERROR: Unsupported particle distribution\n");  
+                   exit(EXIT_FAILURE);
   }   
 
   printf("Number of particles placed     = %lld\n", n);

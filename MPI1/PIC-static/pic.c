@@ -85,13 +85,6 @@ HISTORY: - Written by Evangelos Georganas, August 2015.
 #define PRK_M_PI 3.14159265358979323846264338327950288419716939937510
 #endif
 
-#include <sys/types.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <sys/time.h>
-
 #define MASS_INV 1.0
 #define Q 1.0
 #define epsilon 0.000001
@@ -121,11 +114,11 @@ typedef struct particle_t {
   double   v_x;  // component of velocity in x direction
   double   v_y;  // component of velocity in y direction
   double   q;    // charge of the particle
+  double   k;    // determines how many cells particles move per time step in the x direction 
+  double   m;    //  determines how many cells particles move per time step in the y direction
   /* The following variables are used only for verification/debug purposes */
   double   x0;   // initial position in x
   double   y0;   // initial position in y
-  double   k;
-  double   m;
   double   ID;   // ID of particle; use double to create homogeneous type
 } particle_t;
 
